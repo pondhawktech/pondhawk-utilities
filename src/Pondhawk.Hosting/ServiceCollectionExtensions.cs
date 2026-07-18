@@ -109,6 +109,60 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Registers start (and optional stop) hooks for a service that is <em>already</em> registered —
+    /// e.g. one registered through a factory delegate, which
+    /// <see cref="AddSingletonWithStart{TService}(IServiceCollection, Action{TService})"/>'s
+    /// default-constructor path cannot express. Does not register the service itself; only hooks its
+    /// lifecycle onto host startup/shutdown.
+    /// </summary>
+    /// <typeparam name="TService">The already-registered service type to start.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="startAction">The synchronous action to run on host startup.</param>
+    /// <param name="stopAction">The synchronous action to run on host shutdown, or <see langword="null"/> for no-op.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddStart<TService>(
+        this IServiceCollection services,
+        Action<TService> startAction,
+        Action<TService>? stopAction = null)
+        where TService : class
+    {
+        return services.AddStart<TService>(
+            (svc, _) => { startAction(svc); return Task.CompletedTask; },
+            stopAction is null ? null : (svc, _) => { stopAction(svc); return Task.CompletedTask; });
+    }
+
+    /// <summary>
+    /// Registers async start (and optional stop) hooks for a service that is <em>already</em> registered,
+    /// without registering the service itself.
+    /// </summary>
+    /// <typeparam name="TService">The already-registered service type to start.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="startAction">The async function to run on host startup.</param>
+    /// <param name="stopAction">The async function to run on host shutdown, or <see langword="null"/> for no-op.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddStart<TService>(
+        this IServiceCollection services,
+        Func<TService, CancellationToken, Task> startAction,
+        Func<TService, CancellationToken, Task>? stopAction = null)
+        where TService : class
+    {
+        EnsureHostedService(services);
+
+        var descriptor = new ServiceStartDescriptor
+        {
+            ServiceType = typeof(TService),
+            StartAction = (svc, ct) => startAction((TService)svc, ct),
+            StopAction = stopAction is not null
+                ? (svc, ct) => stopAction((TService)svc, ct)
+                : (_, _) => Task.CompletedTask,
+        };
+
+        services.AddSingleton(descriptor);
+
+        return services;
+    }
+
     private static void EnsureHostedService(IServiceCollection services)
     {
         services.TryAddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
