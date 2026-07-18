@@ -3,9 +3,13 @@
     <Project Path="src/Pondhawk.Core/Pondhawk.Core.csproj" />
     <Project Path="src/Pondhawk.Hosting/Pondhawk.Hosting.csproj" />
     <Project Path="src/Pondhawk.Api/Pondhawk.Api.csproj" />
+    <Project Path="src/Pondhawk.Persistence/Pondhawk.Persistence.csproj" />
   </Folder>
   <Folder Name="/build/">
     <Project Path="build/Build.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Pondhawk.Sample.Api/Pondhawk.Sample.Api.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Pondhawk.Core.Tests/Pondhawk.Core.Tests.csproj" />

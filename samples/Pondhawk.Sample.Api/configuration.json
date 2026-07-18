@@ -1,0 +1,5 @@
+{
+  "Urls": "http://localhost:5100",
+  "ConnectionString": "Data Source=widgets.db",
+  "AuthMode": "development"
+}
