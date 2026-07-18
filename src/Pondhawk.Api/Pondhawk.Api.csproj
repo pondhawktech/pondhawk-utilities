@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pondhawk.Core\Pondhawk.Core.csproj" />
+    <ProjectReference Include="..\Pondhawk.Hosting\Pondhawk.Hosting.csproj" />
   </ItemGroup>
 
 </Project>
