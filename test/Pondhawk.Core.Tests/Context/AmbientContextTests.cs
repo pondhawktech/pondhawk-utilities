@@ -1,6 +1,7 @@
 // Copyright (c) Pond Hawk Technologies Inc. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Diagnostics;
 using Pondhawk.Context;
 using Shouldly;
 using Xunit;
@@ -237,6 +238,137 @@ public class AmbientContextTests
 
         Should.Throw<ArgumentException>(() => AmbientContext.Get<string>(name));
         Should.Throw<ArgumentException>(() => AmbientContext.Set(name, "acme"));
+    }
+
+    [Fact]
+    public void A_scope_starts_an_activity_when_there_is_none()
+    {
+        Activity.Current.ShouldBeNull();
+
+        using (var scope = AmbientContext.CreateScope())
+        {
+            Activity.Current.ShouldNotBeNull("baggage has nowhere to go without one");
+        }
+
+        Activity.Current.ShouldBeNull("the scope must stop what it started");
+    }
+
+    [Fact]
+    public void A_scope_adopts_an_activity_that_already_exists()
+    {
+        using var host = new Activity("request");
+        host.Start();
+
+        using (var scope = AmbientContext.CreateScope())
+        {
+            Activity.Current.ShouldBeSameAs(host, "a second activity would fragment the trace");
+        }
+
+        Activity.Current.ShouldBeSameAs(host);
+        host.Stop();
+    }
+
+    [Fact]
+    public void A_shared_value_reads_back_like_any_other()
+    {
+        using var scope = AmbientContext.CreateScope();
+
+        AmbientContext.SetShared("pondhawk.debug", "true");
+
+        AmbientContext.Get<string>("pondhawk.debug").ShouldBe("true");
+    }
+
+    [Fact]
+    public void A_shared_value_is_written_to_baggage_so_it_travels()
+    {
+        using var scope = AmbientContext.CreateScope();
+
+        AmbientContext.SetShared("pondhawk.debug", "true");
+
+        Activity.Current!.GetBaggageItem("pondhawk.debug").ShouldBe("true");
+    }
+
+    [Fact]
+    public void A_shared_value_survives_into_a_child_activity()
+    {
+        using var scope = AmbientContext.CreateScope();
+
+        AmbientContext.SetShared("pondhawk.debug", "true");
+
+        using var command = new Activity("db-command");
+        command.Start();
+
+        AmbientContext.Get<string>("pondhawk.debug").ShouldBe(
+            "true",
+            "an audit interceptor runs inside a child span and must still see it");
+
+        command.Stop();
+    }
+
+    [Fact]
+    public void An_in_process_value_is_not_written_to_baggage()
+    {
+        using var scope = AmbientContext.CreateScope();
+
+        AmbientContext.Set("TenantCode", "acme");
+
+        Activity.Current!.GetBaggageItem("TenantCode").ShouldBeNull(
+            "subject and tenant must not ride outbound calls to third parties");
+    }
+
+    [Fact]
+    public void A_value_an_upstream_process_sent_is_visible_without_being_set_here()
+    {
+        using var inbound = new Activity("inbound");
+        inbound.SetBaggage(AmbientContext.CorrelationKey, "01KZP4FXVACXT48B3P7B658JHC");
+        inbound.Start();
+
+        using var scope = AmbientContext.CreateScope();
+
+        AmbientContext.CorrelationId.ShouldBe("01KZP4FXVACXT48B3P7B658JHC");
+
+        inbound.Stop();
+    }
+
+    [Fact]
+    public void CorrelationId_round_trips_through_the_key_the_log_pipeline_reads()
+    {
+        using var scope = AmbientContext.CreateScope();
+
+        AmbientContext.CorrelationId = "01KZP4FXVACXT48B3P7B658JHC";
+
+        AmbientContext.CorrelationId.ShouldBe("01KZP4FXVACXT48B3P7B658JHC");
+        Activity.Current!.GetBaggageItem("pondhawk.correlation").ShouldBe(
+            "01KZP4FXVACXT48B3P7B658JHC",
+            "Pondhawk.Logging reads this exact key, and Core cannot reference its constant");
+    }
+
+    [Fact]
+    public void Sharing_outside_a_scope_throws()
+    {
+        AmbientContext.IsActive.ShouldBeFalse();
+
+        var error = Should.Throw<InvalidOperationException>(() => AmbientContext.SetShared("pondhawk.debug", "true"));
+
+        error.Message.ShouldContain("CreateScope");
+    }
+
+    [Fact]
+    public void A_shared_write_lands_on_the_scope_not_on_whatever_span_is_running()
+    {
+        using var scope = AmbientContext.CreateScope();
+        var anchor = Activity.Current;
+
+        using (var command = new Activity("db-command"))
+        {
+            command.Start();
+            AmbientContext.SetShared("pondhawk.debug", "true");
+            command.Stop();
+        }
+
+        anchor!.GetBaggageItem("pondhawk.debug").ShouldBe(
+            "true",
+            "a write on the child span would be lost when the span ended");
     }
 
     private static async Task<string> ReadTenantAsync()
