@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Pondhawk.Utilities/Pondhawk.Utilities.csproj" />
+  </Folder>
+  <Folder Name="/build/">
+    <Project Path="build/Build.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Pondhawk.Utilities.Tests/Pondhawk.Utilities.Tests.csproj" />
+  </Folder>
+</Solution>
