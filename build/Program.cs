@@ -33,15 +33,13 @@ public class BuildContext : FrostingContext
 
     public string[] SourceProjects { get; } =
     [
-        "src/Pondhawk.Core/Pondhawk.Core.csproj",
-        "src/Pondhawk.Hosting/Pondhawk.Hosting.csproj",
-        "src/Pondhawk.Api/Pondhawk.Api.csproj"
+        "src/Pondhawk.Utilities/Pondhawk.Utilities.csproj"
     ];
 
     public BuildContext(ICakeContext context) : base(context)
     {
         Configuration = context.Argument("configuration", "Release");
-        Solution = context.Argument("solution", "pondhawk-tools.slnx");
+        Solution = context.Argument("solution", "pondhawk-utilities.slnx");
         PackageVersion = context.Argument<string?>("package-version", null);
         SkipDuplicate = context.Argument("skip-duplicate", true);
         Artifacts = context.Argument("artifacts", "artifacts");
